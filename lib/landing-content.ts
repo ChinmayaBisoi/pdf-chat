@@ -17,6 +17,8 @@ export interface LandingFeature {
   icon: LucideIcon;
 }
 
+export const landingGithubSourceUrl = "https://github.com/ChinmayaBisoi/pdf-chat";
+
 export const landingHero = {
   title: "Your PDFs, answered.",
   subtitle: "Pdf Chats",
