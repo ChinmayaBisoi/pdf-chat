@@ -1,7 +1,9 @@
 "use client";
 
+import { Loader2 } from "lucide-react";
 import { UploadPdfButton } from "@/components/uploadthing-button";
 import type { IngestPhase } from "@/lib/pdf/types";
+import { cn } from "@/lib/utils";
 
 interface PdfUploaderProps {
   phase: IngestPhase;
@@ -9,6 +11,9 @@ interface PdfUploaderProps {
   onReady: (payload: { documentId: string; fileUrl: string }) => void;
   onError: (message: string) => void;
   onCreditsRemaining?: (n: number) => void;
+  /** Full-width centered hero vs compact toolbar control */
+  layout?: "hero" | "compact";
+  onUploadStart?: () => void;
 }
 
 export function PdfUploader({
@@ -17,20 +22,51 @@ export function PdfUploader({
   onReady,
   onError,
   onCreditsRemaining,
+  layout = "hero",
+  onUploadStart,
 }: PdfUploaderProps) {
   const busy =
     phase === "uploading" || phase === "parsing" || phase === "embedding";
 
+  const isHero = layout === "hero";
+
   return (
-    <div className="flex flex-col gap-2">
+    <div
+      className={cn(
+        "flex flex-col gap-3",
+        isHero && "w-full max-w-sm items-center",
+      )}
+    >
       <UploadPdfButton
         endpoint="pdfUploader"
+        appearance={{
+          container: isHero
+            ? "flex w-full flex-col items-center gap-2"
+            : "flex flex-col items-end gap-1",
+          button: ({ ready, isUploading }) =>
+            cn(
+              isHero &&
+              "w-full max-w-sm rounded-full px-8 py-2.5 text-base font-medium shadow-sm",
+              "whitespace-nowrap",
+              !ready && "opacity-70",
+              isUploading && "cursor-wait",
+            ),
+          allowedContent: cn(
+            "text-xs text-muted-foreground",
+            !isHero && "text-right",
+          ),
+        }}
         content={{
           button: ({ ready }) =>
-            ready ? "Choose PDF" : "Preparing…",
+            ready
+              ? isHero
+                ? "Select PDF"
+                : "Replace PDF"
+              : "Preparing…",
           allowedContent: () => "PDF only, up to 32 MB",
         }}
         onUploadBegin={() => {
+          onUploadStart?.();
           onPhaseChange("uploading");
           onError("");
         }}
@@ -80,11 +116,20 @@ export function PdfUploader({
         }}
       />
       {busy && (
-        <p className="text-sm text-muted-foreground">
-          {phase === "uploading" && "Uploading…"}
-          {phase === "parsing" && "Reading PDF…"}
-          {phase === "embedding" && "Embedding pages (this can take a minute)…"}
-        </p>
+        <div
+          className={cn(
+            "flex items-center gap-2 text-sm text-muted-foreground",
+            isHero && "justify-center text-center",
+          )}
+        >
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+          <span>
+            {phase === "uploading" && "Uploading…"}
+            {phase === "parsing" && "Reading PDF…"}
+            {phase === "embedding" &&
+              "Embedding pages (this can take a minute)…"}
+          </span>
+        </div>
       )}
     </div>
   );

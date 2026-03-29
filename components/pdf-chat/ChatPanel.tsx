@@ -84,7 +84,7 @@ export function ChatPanel({
   }
 
   return (
-    <Card className="flex flex-col border shadow-sm">
+    <Card className="flex flex-col border shadow-sm max-h-fit">
       <CardHeader className="pb-2">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <CardTitle className="text-base">Chat</CardTitle>
@@ -123,7 +123,7 @@ export function ChatPanel({
                 }
               >
                 <p className="whitespace-pre-wrap">{msg.content}</p>
-                {msg.role === "assistant" &&
+                {/* {msg.role === "assistant" &&
                   msg.citations &&
                   msg.citations.length > 0 && (
                     <CitationChips
@@ -131,7 +131,7 @@ export function ChatPanel({
                       allowedPages={allowed}
                       onPageClick={onCitationClick}
                     />
-                  )}
+                  )} */}
               </div>
             );
           })}
