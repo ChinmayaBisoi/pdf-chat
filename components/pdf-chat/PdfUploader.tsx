@@ -36,7 +36,8 @@ export function PdfUploader({
         }}
         onClientUploadComplete={async (res) => {
           const file = res[0];
-          if (!file?.url) {
+          const publicFileUrl = file?.ufsUrl ?? file?.url;
+          if (!publicFileUrl) {
             onPhaseChange("failed");
             onError("Upload did not return a file URL");
             return;
@@ -48,7 +49,7 @@ export function PdfUploader({
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                fileUrl: file.url,
+                fileUrl: publicFileUrl,
                 uploadThingKey: file.key,
               }),
             });
@@ -66,7 +67,7 @@ export function PdfUploader({
             if (!data.documentId) {
               throw new Error("No document id returned");
             }
-            onReady({ documentId: data.documentId, fileUrl: file.url });
+            onReady({ documentId: data.documentId, fileUrl: publicFileUrl });
             onPhaseChange("ready");
           } catch (e) {
             onPhaseChange("failed");
