@@ -19,46 +19,43 @@ interface PdfViewerPaneProps {
 }
 
 export function PdfViewerPane({ fileUrl, jumpRef }: PdfViewerPaneProps) {
-  const pageNav = useMemo(() => pageNavigationPlugin(), []);
-  const highlight = useMemo(
-    () =>
-      highlightPlugin({
-        trigger: Trigger.TextSelection,
-        renderHighlightTarget: (props) => (
-          <div className="flex gap-2 rounded-md border border-border bg-background p-2 shadow-md">
-            <button
-              type="button"
-              className="text-sm font-medium text-primary"
-              onClick={props.toggle}
-            >
-              Save highlight
-            </button>
-            <button
-              type="button"
-              className="text-sm text-muted-foreground"
-              onClick={props.cancel}
-            >
-              Cancel
-            </button>
-          </div>
-        ),
-        renderHighlightContent: (props) => (
-          <div className="max-w-xs rounded-md border bg-background p-3 text-sm shadow">
-            <p className="text-muted-foreground">Highlight saved.</p>
-            <button
-              type="button"
-              className="mt-2 text-primary"
-              onClick={() => props.cancel()}
-            >
-              Close
-            </button>
-          </div>
-        ),
-      }),
-    [],
-  );
+  // These are React hooks internally; do not wrap in useMemo (Rules of Hooks).
+  const pageNav = pageNavigationPlugin();
+  const highlight = highlightPlugin({
+    trigger: Trigger.TextSelection,
+    renderHighlightTarget: (props) => (
+      <div className="flex gap-2 rounded-md border border-border bg-background p-2 shadow-md">
+        <button
+          type="button"
+          className="text-sm font-medium text-primary"
+          onClick={props.toggle}
+        >
+          Save highlight
+        </button>
+        <button
+          type="button"
+          className="text-sm text-muted-foreground"
+          onClick={props.cancel}
+        >
+          Cancel
+        </button>
+      </div>
+    ),
+    renderHighlightContent: (props) => (
+      <div className="max-w-xs rounded-md border bg-background p-3 text-sm shadow">
+        <p className="text-muted-foreground">Highlight saved.</p>
+        <button
+          type="button"
+          className="mt-2 text-primary"
+          onClick={() => props.cancel()}
+        >
+          Close
+        </button>
+      </div>
+    ),
+  });
 
-  const layout = useMemo(() => defaultLayoutPlugin(), []);
+  const layout = defaultLayoutPlugin();
 
   const plugins = useMemo(
     () => [layout, pageNav, highlight],
