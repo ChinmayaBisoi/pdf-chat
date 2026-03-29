@@ -103,12 +103,14 @@ export function ChatPanel({
             </p>
           )}
           {messages.map((msg) => {
+            const citationPages = msg.citations?.map((c) => c.page) ?? [];
             const allowed =
               msg.role === "assistant"
                 ? new Set(
-                  msg.allowedCitationPages ??
-                  msg.citations?.map((c) => c.page) ??
-                  [],
+                  msg.allowedCitationPages &&
+                    msg.allowedCitationPages.length > 0
+                    ? msg.allowedCitationPages
+                    : citationPages,
                 )
                 : new Set<number>();
             return (

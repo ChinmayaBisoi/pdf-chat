@@ -19,6 +19,8 @@ interface PdfViewerPaneProps {
 }
 
 export function PdfViewerPane({ fileUrl, jumpRef }: PdfViewerPaneProps) {
+  // These factories use React hooks internally; they must run at component top
+  // level, not inside useMemo (see rules of hooks).
   const pageNav = pageNavigationPlugin();
   const highlight = highlightPlugin({
     trigger: Trigger.TextSelection,

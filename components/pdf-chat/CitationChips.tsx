@@ -25,7 +25,10 @@ export function CitationChips({
           <button
             key={`${c.page}-${i}`}
             type="button"
-            onClick={() => ok && onPageClick(c.page)}
+            onClick={() => {
+              ok && onPageClick(c.page);
+
+            }}
             className={ok ? "cursor-pointer" : "cursor-not-allowed opacity-50"}
           >
             <Badge variant={ok ? "secondary" : "outline"}>
