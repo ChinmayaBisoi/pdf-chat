@@ -7,7 +7,8 @@ const citationSchema = z.object({
   citations: z.array(
     z.object({
       page: z.number().int().positive(),
-      excerpt: z.string().optional(),
+      // OpenAI json_schema requires every property key in `required`; use "" when no quote.
+      excerpt: z.string(),
     }),
   ),
 });
@@ -36,7 +37,7 @@ export async function generateCitationAnswer(params: {
 Rules:
 - Every factual claim must be supported by the excerpts.
 - citations[].page MUST be one of these page numbers: ${pagesList}. Do not cite any other page.
-- Keep excerpts short (optional) when they help the user verify.`,
+- For each citation, set excerpt to a short quote from that page, or "" if you only need the page number.`,
       },
       {
         role: "user",
