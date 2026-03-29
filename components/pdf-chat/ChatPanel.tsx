@@ -9,9 +9,16 @@ import type { ChatMessage } from "@/lib/pdf/types";
 interface ChatPanelProps {
   documentId: string | null;
   onCitationClick: (page: number) => void;
+  credits: number | null;
+  onCreditsChange: (n: number) => void;
 }
 
-export function ChatPanel({ documentId, onCitationClick }: ChatPanelProps) {
+export function ChatPanel({
+  documentId,
+  onCitationClick,
+  credits,
+  onCreditsChange,
+}: ChatPanelProps) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -44,10 +51,18 @@ export function ChatPanel({ documentId, onCitationClick }: ChatPanelProps) {
         answer?: string;
         citations?: { page: number; excerpt?: string }[];
         allowedPages?: number[];
+        creditsRemaining?: number;
         error?: string;
+        code?: string;
       };
       if (!r.ok) {
+        if (typeof data.creditsRemaining === "number") {
+          onCreditsChange(data.creditsRemaining);
+        }
         throw new Error(data.error ?? "Request failed");
+      }
+      if (typeof data.creditsRemaining === "number") {
+        onCreditsChange(data.creditsRemaining);
       }
       const citations = data.citations ?? [];
       const allowedCitationPages = data.allowedPages ?? [];
@@ -71,7 +86,14 @@ export function ChatPanel({ documentId, onCitationClick }: ChatPanelProps) {
   return (
     <Card className="flex flex-col border shadow-sm">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">Chat</CardTitle>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <CardTitle className="text-base">Chat</CardTitle>
+          {credits !== null && (
+            <span className="text-xs text-muted-foreground tabular-nums">
+              Credits: {credits}
+            </span>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-3">
         <div className="max-h-[320px] min-h-[200px] space-y-3 overflow-y-auto text-sm">

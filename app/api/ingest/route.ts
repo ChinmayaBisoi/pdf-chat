@@ -8,6 +8,12 @@ import {
   PdfFetchError,
   PdfPageLimitError,
 } from "@/lib/pdf/ingest";
+import { getCreditsBalance } from "@/lib/usage/credits";
+import { InsufficientCreditsError } from "@/lib/usage/errors";
+import {
+  checkRateLimit,
+  retryAfterSecondsForKind,
+} from "@/lib/usage/rate-limit";
 
 const bodySchema = z.object({
   fileUrl: z.url(),
@@ -35,6 +41,22 @@ export async function POST(req: Request) {
     );
   }
 
+  const rl = await checkRateLimit(userId, "ingest_hour");
+  if (!rl.ok) {
+    const res = NextResponse.json(
+      {
+        error: "Too many PDF uploads. Try again later.",
+        code: "RATE_LIMIT",
+      },
+      { status: 429 },
+    );
+    res.headers.set(
+      "Retry-After",
+      String(retryAfterSecondsForKind("ingest_hour")),
+    );
+    return res;
+  }
+
   try {
     const { documentId } = await ingestPdfFromUrl({
       clerkUserId: userId,
@@ -43,6 +65,17 @@ export async function POST(req: Request) {
     });
     return NextResponse.json({ documentId });
   } catch (e) {
+    if (e instanceof InsufficientCreditsError) {
+      const creditsRemaining = await getCreditsBalance(userId);
+      return NextResponse.json(
+        {
+          error: e.message,
+          code: "INSUFFICIENT_CREDITS",
+          creditsRemaining,
+        },
+        { status: 403 },
+      );
+    }
     if (e instanceof InvalidIngestUrlError) {
       return NextResponse.json({ error: e.message }, { status: 400 });
     }

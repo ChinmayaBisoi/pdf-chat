@@ -8,6 +8,7 @@ interface PdfUploaderProps {
   onPhaseChange: (p: IngestPhase) => void;
   onReady: (payload: { documentId: string; fileUrl: string }) => void;
   onError: (message: string) => void;
+  onCreditsRemaining?: (n: number) => void;
 }
 
 export function PdfUploader({
@@ -15,6 +16,7 @@ export function PdfUploader({
   onPhaseChange,
   onReady,
   onError,
+  onCreditsRemaining,
 }: PdfUploaderProps) {
   const busy =
     phase === "uploading" || phase === "parsing" || phase === "embedding";
@@ -53,8 +55,12 @@ export function PdfUploader({
             const data = (await r.json()) as {
               documentId?: string;
               error?: string;
+              creditsRemaining?: number;
             };
             if (!r.ok) {
+              if (typeof data.creditsRemaining === "number") {
+                onCreditsRemaining?.(data.creditsRemaining);
+              }
               throw new Error(data.error ?? "Ingest failed");
             }
             if (!data.documentId) {

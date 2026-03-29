@@ -1,6 +1,9 @@
 import { embedTexts } from "@/lib/ai/embeddings";
 import { assertUploadThingFileUrlForIngest } from "@/lib/ingest-file-url";
 import { getSql } from "@/lib/db";
+import { getCreditCostEmbedPerPage } from "@/lib/usage/config";
+import { consumeCredits, refundCredits } from "@/lib/usage/credits";
+import { InsufficientCreditsError } from "@/lib/usage/errors";
 import { extractPdfPages } from "@/lib/pdf/extract";
 
 const MAX_INDEXED_PAGES = 300;
@@ -51,33 +54,45 @@ export async function ingestPdfFromUrl(params: {
   }
 
   const texts = nonEmpty.map((p) => p.text);
-  const embeddings = await embedTexts(texts);
-
-  await sql`DELETE FROM documents WHERE clerk_user_id = ${params.clerkUserId}`;
-
-  const [doc] = await sql`
-    INSERT INTO documents (clerk_user_id, file_url, upload_thing_key)
-    VALUES (${params.clerkUserId}, ${params.fileUrl}, ${params.uploadThingKey ?? null})
-    RETURNING id
-  `;
-
-  const documentId = doc.id as string;
-
-  for (let i = 0; i < nonEmpty.length; i++) {
-    const page = nonEmpty[i].page;
-    const text = nonEmpty[i].text;
-    const embedding = embeddings[i];
-    const vectorLiteral = JSON.stringify(embedding);
-    await sql`
-      INSERT INTO chunks (document_id, page, text, embedding)
-      VALUES (
-        ${documentId}::uuid,
-        ${page},
-        ${text},
-        ${vectorLiteral}::vector
-      )
-    `;
+  const perPage = getCreditCostEmbedPerPage();
+  const ingestCost = nonEmpty.length * perPage;
+  const spent = await consumeCredits(params.clerkUserId, ingestCost);
+  if (!spent.ok) {
+    throw new InsufficientCreditsError();
   }
 
-  return { documentId };
+  try {
+    const embeddings = await embedTexts(texts);
+
+    await sql`DELETE FROM documents WHERE clerk_user_id = ${params.clerkUserId}`;
+
+    const [doc] = await sql`
+      INSERT INTO documents (clerk_user_id, file_url, upload_thing_key)
+      VALUES (${params.clerkUserId}, ${params.fileUrl}, ${params.uploadThingKey ?? null})
+      RETURNING id
+    `;
+
+    const documentId = doc.id as string;
+
+    for (let i = 0; i < nonEmpty.length; i++) {
+      const page = nonEmpty[i].page;
+      const text = nonEmpty[i].text;
+      const embedding = embeddings[i];
+      const vectorLiteral = JSON.stringify(embedding);
+      await sql`
+        INSERT INTO chunks (document_id, page, text, embedding)
+        VALUES (
+          ${documentId}::uuid,
+          ${page},
+          ${text},
+          ${vectorLiteral}::vector
+        )
+      `;
+    }
+
+    return { documentId };
+  } catch (e) {
+    await refundCredits(params.clerkUserId, ingestCost);
+    throw e;
+  }
 }

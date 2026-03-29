@@ -4,6 +4,12 @@ import { z } from "zod";
 import { getSql } from "@/lib/db";
 import { generateCitationAnswer } from "@/lib/ai/citation-chat";
 import { dedupePages, retrieveChunksForQuery } from "@/lib/pdf/retrieve";
+import { getCreditCostChat } from "@/lib/usage/config";
+import { consumeCredits, getCreditsBalance, refundCredits } from "@/lib/usage/credits";
+import {
+  checkRateLimit,
+  retryAfterSecondsForKind,
+} from "@/lib/usage/rate-limit";
 
 const bodySchema = z.object({
   documentId: z.uuid(),
@@ -43,6 +49,36 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Document not found" }, { status: 404 });
   }
 
+  const rl = await checkRateLimit(userId, "chat_minute");
+  if (!rl.ok) {
+    const res = NextResponse.json(
+      {
+        error: "Too many chat requests. Try again in a moment.",
+        code: "RATE_LIMIT",
+      },
+      { status: 429 },
+    );
+    res.headers.set(
+      "Retry-After",
+      String(retryAfterSecondsForKind("chat_minute")),
+    );
+    return res;
+  }
+
+  const chatCost = getCreditCostChat();
+  const spent = await consumeCredits(userId, chatCost);
+  if (!spent.ok) {
+    const creditsRemaining = await getCreditsBalance(userId);
+    return NextResponse.json(
+      {
+        error: "Insufficient credits for this chat message.",
+        code: "INSUFFICIENT_CREDITS",
+        creditsRemaining,
+      },
+      { status: 403 },
+    );
+  }
+
   try {
     const chunks = await retrieveChunksForQuery({
       documentId,
@@ -51,6 +87,7 @@ export async function POST(req: Request) {
     });
 
     if (chunks.length === 0) {
+      await refundCredits(userId, chatCost);
       return NextResponse.json(
         { error: "No indexed content for this document. Try re-uploading." },
         { status: 422 },
@@ -66,8 +103,13 @@ export async function POST(req: Request) {
       allowedPages,
     });
 
-    return NextResponse.json({ ...result, allowedPages });
+    return NextResponse.json({
+      ...result,
+      allowedPages,
+      creditsRemaining: spent.balance,
+    });
   } catch (e) {
+    await refundCredits(userId, chatCost);
     console.error("chat failed", e);
     return NextResponse.json({ error: "Chat failed" }, { status: 500 });
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PdfUploader } from "@/components/pdf-chat/PdfUploader";
 import { ChatPanel } from "@/components/pdf-chat/ChatPanel";
 
@@ -25,6 +25,26 @@ export function PdfWorkspace() {
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [documentId, setDocumentId] = useState<string | null>(null);
   const [ingestError, setIngestError] = useState("");
+  const [credits, setCredits] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const r = await fetch("/api/usage");
+        if (!r.ok) return;
+        const data = (await r.json()) as { credits?: number };
+        if (!cancelled && typeof data.credits === "number") {
+          setCredits(data.credits);
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [documentId]);
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6">
@@ -44,12 +64,15 @@ export function PdfWorkspace() {
               setIngestError("");
             }}
             onError={setIngestError}
+            onCreditsRemaining={setCredits}
           />
           <PdfViewerPane fileUrl={fileUrl} jumpRef={jumpRef} />
         </div>
         <ChatPanel
           documentId={documentId}
           onCitationClick={(page) => jumpRef.current?.(page)}
+          credits={credits}
+          onCreditsChange={setCredits}
         />
       </div>
     </div>
