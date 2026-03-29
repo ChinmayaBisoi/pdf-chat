@@ -1,5 +1,7 @@
-import { Upload, ArrowRight } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LandingPdfCta } from "@/components/landing/LandingPdfCta";
 
 export function CtaSection() {
   return (
@@ -16,13 +18,12 @@ export function CtaSection() {
         </div>
 
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Button size="lg" className="gap-2 px-6 text-base">
-            <Upload className="size-4" />
-            Upload a PDF
-          </Button>
-          <Button variant="outline" size="lg" className="gap-2 px-6 text-base">
-            Learn more
-            <ArrowRight className="size-4" />
+          <LandingPdfCta size="lg" label="Upload a PDF" />
+          <Button variant="outline" size="lg" className="gap-2 px-6 text-base" asChild>
+            <Link href="/#features">
+              Learn more
+              <ArrowRight className="size-4" />
+            </Link>
           </Button>
         </div>
       </div>

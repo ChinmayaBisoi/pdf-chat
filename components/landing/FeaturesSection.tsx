@@ -8,7 +8,10 @@ import {
 
 export function FeaturesSection() {
   return (
-    <section className="w-full border-t border-border/40 bg-muted/30">
+    <section
+      id="features"
+      className="w-full scroll-mt-16 border-t border-border/40 bg-muted/30"
+    >
       <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:py-28">
         <div className="mx-auto max-w-2xl space-y-3 text-center">
           <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">

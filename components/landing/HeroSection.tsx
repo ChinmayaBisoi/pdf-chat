@@ -1,6 +1,8 @@
-import { Upload, ArrowRight, Zap, Lock, Shield, Globe } from "lucide-react";
+import { ArrowRight, Zap, Lock, Shield, Globe } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { LandingPdfCta } from "@/components/landing/LandingPdfCta";
 import { landingHero, trustBadges } from "@/lib/landing-content";
 
 const trustIcons = {
@@ -36,13 +38,12 @@ export function HeroSection() {
         </div>
 
         <div className="flex flex-col items-center gap-3 pt-2 sm:flex-row">
-          <Button size="lg" className="gap-2 px-6 text-base">
-            <Upload className="size-4" />
-            {landingHero.primaryCta}
-          </Button>
-          <Button variant="outline" size="lg" className="gap-2 px-6 text-base">
-            {landingHero.secondaryCta}
-            <ArrowRight className="size-4" />
+          <LandingPdfCta size="lg" label={landingHero.primaryCta} />
+          <Button variant="outline" size="lg" className="gap-2 px-6 text-base" asChild>
+            <Link href="/#features">
+              {landingHero.secondaryCta}
+              <ArrowRight className="size-4" />
+            </Link>
           </Button>
         </div>
 
