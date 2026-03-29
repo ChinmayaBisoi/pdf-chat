@@ -2,9 +2,9 @@ import { embedTexts } from "@/lib/ai/embeddings";
 import { assertUploadThingFileUrlForIngest } from "@/lib/ingest-file-url";
 import { getSql } from "@/lib/db";
 import { getCreditCostEmbedPerPage } from "@/lib/usage/config";
-import { consumeCredits, refundCredits } from "@/lib/usage/credits";
+import { consumeCredits, getCreditsBalance, refundCredits } from "@/lib/usage/credits";
 import { InsufficientCreditsError } from "@/lib/usage/errors";
-import { extractPdfPages } from "@/lib/pdf/extract";
+import { extractPdfPages, getPdfPageCount } from "@/lib/pdf/extract";
 
 const MAX_INDEXED_PAGES = 300;
 
@@ -44,6 +44,15 @@ export async function ingestPdfFromUrl(params: {
   }
   const buffer = await res.arrayBuffer();
 
+  const pageCount = await getPdfPageCount(buffer);
+  const perPage = getCreditCostEmbedPerPage();
+  const maxBillablePages = Math.min(pageCount, MAX_INDEXED_PAGES);
+  const maxIngestCost = maxBillablePages * perPage;
+  const balance = await getCreditsBalance(params.clerkUserId);
+  if (balance < maxIngestCost) {
+    throw new InsufficientCreditsError();
+  }
+
   const pages = await extractPdfPages(buffer);
   const nonEmpty = pages.filter((p) => p.text.length > 0);
   if (nonEmpty.length === 0) {
@@ -54,7 +63,6 @@ export async function ingestPdfFromUrl(params: {
   }
 
   const texts = nonEmpty.map((p) => p.text);
-  const perPage = getCreditCostEmbedPerPage();
   const ingestCost = nonEmpty.length * perPage;
   const spent = await consumeCredits(params.clerkUserId, ingestCost);
   if (!spent.ok) {
