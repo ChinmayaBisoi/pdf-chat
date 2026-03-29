@@ -11,6 +11,8 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   citations?: Citation[];
+  /** Pages that appeared in retrieval context; citations outside this set are not trusted. */
+  allowedCitationPages?: number[];
 }
 
 export interface Citation {

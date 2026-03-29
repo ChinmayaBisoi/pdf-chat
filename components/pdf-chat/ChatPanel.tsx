@@ -43,12 +43,14 @@ export function ChatPanel({ documentId, onCitationClick }: ChatPanelProps) {
       const data = (await r.json()) as {
         answer?: string;
         citations?: { page: number; excerpt?: string }[];
+        allowedPages?: number[];
         error?: string;
       };
       if (!r.ok) {
         throw new Error(data.error ?? "Request failed");
       }
       const citations = data.citations ?? [];
+      const allowedCitationPages = data.allowedPages ?? [];
       setMessages((m) => [
         ...m,
         {
@@ -56,6 +58,7 @@ export function ChatPanel({ documentId, onCitationClick }: ChatPanelProps) {
           role: "assistant",
           content: data.answer ?? "",
           citations,
+          allowedCitationPages,
         },
       ]);
     } catch (e) {
@@ -79,8 +82,12 @@ export function ChatPanel({ documentId, onCitationClick }: ChatPanelProps) {
           )}
           {messages.map((msg) => {
             const allowed =
-              msg.role === "assistant" && msg.citations
-                ? new Set(msg.citations.map((c) => c.page))
+              msg.role === "assistant"
+                ? new Set(
+                  msg.allowedCitationPages ??
+                  msg.citations?.map((c) => c.page) ??
+                  [],
+                )
                 : new Set<number>();
             return (
               <div

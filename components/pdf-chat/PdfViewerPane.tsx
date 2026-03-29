@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { Viewer, Worker } from "@react-pdf-viewer/core";
 import { defaultLayoutPlugin } from "@react-pdf-viewer/default-layout";
 import { highlightPlugin, Trigger } from "@react-pdf-viewer/highlight";
@@ -56,11 +56,6 @@ export function PdfViewerPane({ fileUrl, jumpRef }: PdfViewerPaneProps) {
 
   const layout = defaultLayoutPlugin();
 
-  const plugins = useMemo(
-    () => [layout, pageNav, highlight],
-    [layout, pageNav, highlight],
-  );
-
   useEffect(() => {
     jumpRef.current = (page: number) => {
       pageNav.jumpToPage(page - 1);
@@ -81,7 +76,11 @@ export function PdfViewerPane({ fileUrl, jumpRef }: PdfViewerPaneProps) {
   return (
     <div className="h-full min-h-[480px] overflow-hidden rounded-lg border bg-background">
       <Worker workerUrl={WORKER_URL}>
-        <Viewer fileUrl={fileUrl} plugins={plugins} defaultScale={1} />
+        <Viewer
+          fileUrl={fileUrl}
+          plugins={[layout, pageNav, highlight]}
+          defaultScale={1}
+        />
       </Worker>
     </div>
   );

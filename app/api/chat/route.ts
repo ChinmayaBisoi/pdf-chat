@@ -7,7 +7,7 @@ import { dedupePages, retrieveChunksForQuery } from "@/lib/pdf/retrieve";
 
 const bodySchema = z.object({
   documentId: z.uuid(),
-  message: z.string().min(1),
+  message: z.string().min(1).max(12_000),
 });
 
 export async function POST(req: Request) {
@@ -66,9 +66,9 @@ export async function POST(req: Request) {
       allowedPages,
     });
 
-    return NextResponse.json(result);
+    return NextResponse.json({ ...result, allowedPages });
   } catch (e) {
-    const messageText = e instanceof Error ? e.message : "Chat failed";
-    return NextResponse.json({ error: messageText }, { status: 500 });
+    console.error("chat failed", e);
+    return NextResponse.json({ error: "Chat failed" }, { status: 500 });
   }
 }

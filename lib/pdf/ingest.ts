@@ -1,6 +1,30 @@
-import { getSql } from "@/lib/db";
 import { embedTexts } from "@/lib/ai/embeddings";
+import { assertUploadThingFileUrlForIngest } from "@/lib/ingest-file-url";
+import { getSql } from "@/lib/db";
 import { extractPdfPages } from "@/lib/pdf/extract";
+
+const MAX_INDEXED_PAGES = 300;
+
+export class PdfPageLimitError extends Error {
+  constructor(maxPages: number) {
+    super(`This PDF has too many pages to index (max ${maxPages}).`);
+    this.name = "PdfPageLimitError";
+  }
+}
+
+export class PdfFetchError extends Error {
+  constructor() {
+    super("Could not download the PDF");
+    this.name = "PdfFetchError";
+  }
+}
+
+export class NoExtractableTextError extends Error {
+  constructor() {
+    super("No extractable text in this PDF");
+    this.name = "NoExtractableTextError";
+  }
+}
 
 export async function ingestPdfFromUrl(params: {
   clerkUserId: string;
@@ -9,16 +33,21 @@ export async function ingestPdfFromUrl(params: {
 }): Promise<{ documentId: string }> {
   const sql = getSql();
 
+  assertUploadThingFileUrlForIngest(params.fileUrl);
+
   const res = await fetch(params.fileUrl);
   if (!res.ok) {
-    throw new Error(`Failed to fetch PDF: ${res.status}`);
+    throw new PdfFetchError();
   }
   const buffer = await res.arrayBuffer();
 
   const pages = await extractPdfPages(buffer);
   const nonEmpty = pages.filter((p) => p.text.length > 0);
   if (nonEmpty.length === 0) {
-    throw new Error("No extractable text in this PDF");
+    throw new NoExtractableTextError();
+  }
+  if (nonEmpty.length > MAX_INDEXED_PAGES) {
+    throw new PdfPageLimitError(MAX_INDEXED_PAGES);
   }
 
   const texts = nonEmpty.map((p) => p.text);

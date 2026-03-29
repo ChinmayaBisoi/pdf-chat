@@ -1,7 +1,13 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { ingestPdfFromUrl } from "@/lib/pdf/ingest";
+import { InvalidIngestUrlError } from "@/lib/ingest-file-url";
+import {
+  ingestPdfFromUrl,
+  NoExtractableTextError,
+  PdfFetchError,
+  PdfPageLimitError,
+} from "@/lib/pdf/ingest";
 
 const bodySchema = z.object({
   fileUrl: z.url(),
@@ -37,7 +43,19 @@ export async function POST(req: Request) {
     });
     return NextResponse.json({ documentId });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Ingest failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    if (e instanceof InvalidIngestUrlError) {
+      return NextResponse.json({ error: e.message }, { status: 400 });
+    }
+    if (e instanceof PdfPageLimitError) {
+      return NextResponse.json({ error: e.message }, { status: 413 });
+    }
+    if (e instanceof NoExtractableTextError) {
+      return NextResponse.json({ error: e.message }, { status: 422 });
+    }
+    if (e instanceof PdfFetchError) {
+      return NextResponse.json({ error: e.message }, { status: 502 });
+    }
+    console.error("ingest failed", e);
+    return NextResponse.json({ error: "Ingest failed" }, { status: 500 });
   }
 }
