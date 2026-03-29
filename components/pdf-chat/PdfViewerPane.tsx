@@ -19,7 +19,6 @@ interface PdfViewerPaneProps {
 }
 
 export function PdfViewerPane({ fileUrl, jumpRef }: PdfViewerPaneProps) {
-  // These are React hooks internally; do not wrap in useMemo (Rules of Hooks).
   const pageNav = pageNavigationPlugin();
   const highlight = highlightPlugin({
     trigger: Trigger.TextSelection,
