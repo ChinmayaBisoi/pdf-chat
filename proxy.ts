@@ -8,7 +8,19 @@ const isProtectedRoute = createRouteMatcher([
   "/api/usage(.*)",
 ]);
 
+/**
+ * UploadThing POSTs callback/error notifications to `/api/uploadthing` from their
+ * infrastructure (signed requests, no browser cookies). Do not require Clerk
+ * here or uploads hang waiting for `onUploadComplete` / client completion.
+ */
+function isUploadThingServerHook(req: Request) {
+  return req.headers.get("uploadthing-hook") != null;
+}
+
 export default clerkMiddleware(async (auth, req) => {
+  if (isUploadThingServerHook(req)) {
+    return;
+  }
   if (isProtectedRoute(req)) {
     await auth.protect();
   }
