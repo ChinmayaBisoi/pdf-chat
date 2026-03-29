@@ -1,45 +1,103 @@
+import type { LucideIcon } from "lucide-react";
+import {
+  Quote,
+  FileText,
+  Highlighter,
+  MessagesSquare,
+  Search,
+  ShieldCheck,
+  Upload,
+  MessageCircle,
+  BookOpen,
+} from "lucide-react";
+
 export interface LandingFeature {
   title: string;
   description: string;
+  icon: LucideIcon;
 }
 
 export const landingHero = {
-  title: "Chat with PDF",
+  title: "Your PDFs, answered.",
+  subtitle: "Pdf Chats",
   description:
-    "Upload any PDF, ask a question, and get concise, citation-linked answers, summaries, and follow-ups in seconds. Free tier, encrypted in transit, no training on your files.",
+    "Upload any PDF and get instant, citation-linked answers, section-by-section summaries, and context-aware follow-ups. No sign-up required to start.",
   primaryCta: "Upload a PDF",
   secondaryCta: "See how it works",
 } as const;
 
 export const landingFeatures: LandingFeature[] = [
   {
-    title: "Citation backed answers",
+    title: "Citation-backed answers",
     description:
-      "Get answers backed by citations from specific sections of the PDF.",
+      "Every answer links back to the exact paragraph and page, so you can verify in seconds.",
+    icon: Quote,
   },
   {
-    title: "Paper summary",
+    title: "Paper summaries",
     description:
-      "Get a detailed section-wise summary for your PDF file.",
+      "Get section-by-section breakdowns of any paper, report, or contract instantly.",
+    icon: FileText,
   },
   {
     title: "Highlighted text explanations",
     description:
-      "Understand complex passages with explanations tied to what you select.",
+      "Select any passage and get a plain-language explanation tied to what you highlighted.",
+    icon: Highlighter,
   },
   {
     title: "Follow-up questions",
     description:
       "Dig deeper with context-aware follow-ups that stay anchored to the document.",
+    icon: MessagesSquare,
   },
   {
     title: "Fast search across pages",
     description:
-      "Jump to relevant pages and snippets without rereading the whole file.",
+      "Jump to the exact page and snippet without scrolling through the entire file.",
+    icon: Search,
   },
   {
     title: "Private by design",
     description:
-      "Your uploads stay yours. No model training on your documents.",
+      "Your uploads stay yours. Files are encrypted in transit and never used for training.",
+    icon: ShieldCheck,
   },
 ];
+
+export interface HowItWorksStep {
+  step: number;
+  title: string;
+  description: string;
+  icon: LucideIcon;
+}
+
+export const howItWorksSteps: HowItWorksStep[] = [
+  {
+    step: 1,
+    title: "Upload your PDF",
+    description: "Drag and drop or browse to upload any PDF up to 50 MB.",
+    icon: Upload,
+  },
+  {
+    step: 2,
+    title: "Ask a question",
+    description:
+      "Type your question in plain language. Pdf Chats finds the answer instantly.",
+    icon: MessageCircle,
+  },
+  {
+    step: 3,
+    title: "Get cited answers",
+    description:
+      "Receive answers with direct citations and page references you can click to verify.",
+    icon: BookOpen,
+  },
+];
+
+export const trustBadges = [
+  { label: "Free tier available", icon: "zap" },
+  { label: "256-bit encrypted", icon: "lock" },
+  { label: "No data training", icon: "shield" },
+  { label: "75+ languages", icon: "globe" },
+] as const;
