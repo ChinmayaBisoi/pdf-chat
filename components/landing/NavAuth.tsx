@@ -21,12 +21,12 @@ export function NavAuth() {
   if (!isSignedIn) {
     return (
       <div className="flex items-center gap-2">
-        <SignInButton mode="modal">
+        <SignInButton mode="modal" forceRedirectUrl="/chat">
           <Button variant="ghost" size="sm">
             Log in
           </Button>
         </SignInButton>
-        <SignUpButton mode="modal">
+        <SignUpButton mode="modal" forceRedirectUrl="/chat">
           <Button size="sm">Get started</Button>
         </SignUpButton>
       </div>
