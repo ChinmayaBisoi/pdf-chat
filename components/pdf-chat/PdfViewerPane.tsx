@@ -16,6 +16,7 @@ import "@react-pdf-viewer/core/lib/styles/index.css";
 import "@react-pdf-viewer/highlight/lib/styles/index.css";
 import "@react-pdf-viewer/search/lib/styles/index.css";
 
+import { searchNeedlesFromExcerpt } from "@/lib/pdf/pdf-search-needles";
 import type { Citation } from "@/lib/pdf/types";
 
 const WORKER_URL =
@@ -28,8 +29,17 @@ interface PdfViewerPaneProps {
   >;
 }
 
-function normalizeQuoteForSearch(s: string): string {
-  return s.trim().replace(/\s+/g, " ");
+function nextAnimationFrame(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+}
+
+async function waitForPaintAfterJump(): Promise<void> {
+  await nextAnimationFrame();
+  await nextAnimationFrame();
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export function PdfViewerPane({ fileUrl, jumpRef }: PdfViewerPaneProps) {
@@ -81,29 +91,40 @@ export function PdfViewerPane({ fileUrl, jumpRef }: PdfViewerPaneProps) {
   useEffect(() => {
     jumpRef.current = async (citation: Citation) => {
       const pageIndex = citation.page - 1;
-      pageNav.jumpToPage(pageIndex);
-
       const raw = citation.excerpt?.trim();
       if (!raw) return;
 
-      search.clearHighlights();
-      search.setTargetPages(({ pageIndex: pi }) => pi === pageIndex);
+      const needles = searchNeedlesFromExcerpt(raw);
 
-      const runSearch = async (needle: string) => {
-        const q = normalizeQuoteForSearch(needle);
-        if (!q) return [];
-        return search.highlight({
-          keyword: q.length > 220 ? q.slice(0, 220) : q,
-          matchCase: false,
-          wholeWords: false,
-        });
+      const tryHighlight = async (): Promise<boolean> => {
+        search.clearHighlights();
+        search.setTargetPages(({ pageIndex: pi }) => pi === pageIndex);
+
+        for (const needle of needles) {
+          const q = needle.length > 220 ? needle.slice(0, 220) : needle;
+          const matches = await search.highlight({
+            keyword: q,
+            matchCase: false,
+            wholeWords: false,
+          });
+          if (matches && matches.length > 0) {
+            return true;
+          }
+        }
+        return false;
       };
 
-      let matches = await runSearch(raw);
-      if (!matches || matches.length === 0) {
-        const shorter = normalizeQuoteForSearch(raw).slice(0, 72);
-        if (shorter.length >= 8) {
-          matches = await runSearch(shorter);
+      // Jump first so the page is in view; the text layer often renders one frame
+      // after scroll. Retries cover slow layers and PDF/DOM text mismatches.
+      const maxAttempts = 5;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (attempt > 0) {
+          await delay(60 * attempt);
+        }
+        pageNav.jumpToPage(pageIndex);
+        await waitForPaintAfterJump();
+        if (await tryHighlight()) {
+          return;
         }
       }
     };
