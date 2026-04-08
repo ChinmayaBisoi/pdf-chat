@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import "./install-pdfjs-node-polyfills";
 import { PDFParse } from "pdf-parse";
 
 /**

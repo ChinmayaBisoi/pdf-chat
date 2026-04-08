@@ -11,6 +11,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@napi-rs/canvas": "0.1.80",
     "@ai-sdk/openai": "^3.0.48",
     "@clerk/nextjs": "^7.0.7",
     "@neondatabase/serverless": "^1.0.2",
