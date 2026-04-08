@@ -2,7 +2,9 @@
 
 import dynamic from "next/dynamic";
 import { MessageCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import type { UIMessage } from "ai";
 import { PdfUploader } from "@/components/pdf-chat/PdfUploader";
 import { ChatPanel } from "@/components/pdf-chat/ChatPanel";
 
@@ -20,15 +22,39 @@ const PdfViewerPane = dynamic(
 );
 import type { Citation, IngestPhase } from "@/lib/pdf/types";
 
-export function PdfWorkspace() {
+export interface PdfWorkspaceInitialThread {
+  projectId: string;
+  documentId: string;
+  fileUrl: string;
+  title: string | null;
+  messages: UIMessage[];
+}
+
+interface PdfWorkspaceProps {
+  initialThread?: PdfWorkspaceInitialThread | null;
+}
+
+export function PdfWorkspace({ initialThread = null }: PdfWorkspaceProps) {
+  const router = useRouter();
   const jumpRef = useRef<((citation: Citation) => void | Promise<void>) | null>(
     null,
   );
-  const [phase, setPhase] = useState<IngestPhase>("idle");
-  const [fileUrl, setFileUrl] = useState<string | null>(null);
-  const [documentId, setDocumentId] = useState<string | null>(null);
+  const [phase, setPhase] = useState<IngestPhase>(
+    initialThread ? "ready" : "idle",
+  );
+  const [fileUrl, setFileUrl] = useState<string | null>(
+    initialThread?.fileUrl ?? null,
+  );
+  const [documentId, setDocumentId] = useState<string | null>(
+    initialThread?.documentId ?? null,
+  );
+  const [projectId, setProjectId] = useState<string | null>(
+    initialThread?.projectId ?? null,
+  );
   const [ingestError, setIngestError] = useState("");
   const [credits, setCredits] = useState<number | null>(null);
+
+  const initialMessages = initialThread?.messages ?? null;
 
   const showPdfAndChat =
     phase === "ready" && documentId !== null && fileUrl !== null;
@@ -55,21 +81,14 @@ export function PdfWorkspace() {
   function handleUploadStart() {
     setDocumentId(null);
     setFileUrl(null);
+    setProjectId(null);
   }
 
   const uploaderProps = {
     phase,
     onPhaseChange: setPhase,
-    onReady: ({
-      documentId: id,
-      fileUrl: url,
-    }: {
-      documentId: string;
-      fileUrl: string;
-    }) => {
-      setDocumentId(id);
-      setFileUrl(url);
-      setIngestError("");
+    onReady: ({ projectId: pid }: { projectId: string }) => {
+      router.replace(`/chat/${pid}`);
     },
     onError: setIngestError,
     onCreditsRemaining: setCredits,
@@ -93,7 +112,7 @@ export function PdfWorkspace() {
                 generative AI.
               </p>
             </div>
-            <PdfUploader {...uploaderProps} layout="hero" />
+            <PdfUploader {...uploaderProps} />
             {ingestError ? (
               <p
                 role="alert"
@@ -106,18 +125,18 @@ export function PdfWorkspace() {
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-4">
-          <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">
-              Document ready. Ask questions in the chat panel.
-            </p>
-            <PdfUploader {...uploaderProps} layout="compact" />
-          </div>
+          <p className="shrink-0 text-sm text-muted-foreground">
+            Document ready. Ask questions in the chat panel.
+          </p>
           <div className="grid min-h-0 flex-1 gap-6 lg:grid-cols-2 lg:items-stretch">
             <div className="flex min-h-0 flex-1 flex-col">
               <PdfViewerPane fileUrl={fileUrl} jumpRef={jumpRef} />
             </div>
             <ChatPanel
+              key={projectId ?? "new-chat"}
+              projectId={projectId}
               documentId={documentId}
+              initialMessages={initialMessages}
               onCitationClick={(citation) => void jumpRef.current?.(citation)}
               credits={credits}
               onCreditsChange={setCredits}

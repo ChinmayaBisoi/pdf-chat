@@ -5,7 +5,6 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
@@ -20,7 +19,9 @@ import type { Citation } from "@/lib/pdf/types";
 import "streamdown/styles.css";
 
 interface ChatPanelProps {
+  projectId: string | null;
   documentId: string | null;
+  initialMessages: UIMessage[] | null;
   onCitationClick: (citation: Citation) => void;
   credits: number | null;
   onCreditsChange: (n: number) => void;
@@ -104,73 +105,103 @@ function AssistantPhaseRow({
   );
 }
 
+type ChatTransportBindings = {
+  documentId: string | null;
+  onCreditsChange: (n: number) => void;
+  onAllowedPages: (pages: number[]) => void;
+};
+
+function createChatTransport(getBindings: () => ChatTransportBindings) {
+  return new DefaultChatTransport({
+    api: "/api/chat",
+    prepareSendMessagesRequest: ({ messages }) => {
+      const bindings = getBindings();
+      const last = messages[messages.length - 1];
+      const text = userMessageText(last);
+      return {
+        body: {
+          documentId: bindings.documentId,
+          message: text,
+        },
+      };
+    },
+    fetch: async (url, init) => {
+      const res = await fetch(url, init);
+      if (!res.ok) {
+        const ct = res.headers.get("content-type") ?? "";
+        if (ct.includes("application/json")) {
+          const j = (await res.json()) as { error?: string };
+          throw new Error(
+            typeof j.error === "string" ? j.error : `Request failed (${res.status})`,
+          );
+        }
+        throw new Error(await res.text());
+      }
+      const bindings = getBindings();
+      const cred = res.headers.get("X-Credits-Remaining");
+      if (cred != null) {
+        const n = Number(cred);
+        if (!Number.isNaN(n)) bindings.onCreditsChange(n);
+      }
+      const pagesRaw = res.headers.get("X-Allowed-Pages");
+      if (pagesRaw) {
+        try {
+          const parsed = JSON.parse(pagesRaw) as unknown;
+          if (
+            Array.isArray(parsed) &&
+            parsed.every((x) => typeof x === "number")
+          ) {
+            bindings.onAllowedPages(parsed);
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      return res;
+    },
+  });
+}
+
 export function ChatPanel({
+  projectId,
   documentId,
+  initialMessages,
   onCitationClick,
   credits,
   onCreditsChange,
 }: ChatPanelProps) {
-  const documentIdRef = useRef(documentId);
-  documentIdRef.current = documentId;
-
   const allowedPagesRef = useRef<number[]>([]);
+  const transportBindingsRef = useRef<ChatTransportBindings>({
+    documentId: null,
+    onCreditsChange: () => { },
+    onAllowedPages: () => { },
+  });
+
   const [allowedByMessageId, setAllowedByMessageId] = useState<
     Map<string, number[]>
   >(() => new Map());
 
-  const transport = useMemo(
-    () =>
-      new DefaultChatTransport({
-        api: "/api/chat",
-        prepareSendMessagesRequest: ({ messages }) => {
-          const last = messages[messages.length - 1];
-          const text = userMessageText(last);
-          return {
-            body: {
-              documentId: documentIdRef.current,
-              message: text,
-            },
-          };
-        },
-        fetch: async (url, init) => {
-          const res = await fetch(url, init);
-          if (!res.ok) {
-            const ct = res.headers.get("content-type") ?? "";
-            if (ct.includes("application/json")) {
-              const j = (await res.json()) as { error?: string };
-              throw new Error(
-                typeof j.error === "string" ? j.error : `Request failed (${res.status})`,
-              );
-            }
-            throw new Error(await res.text());
-          }
-          const cred = res.headers.get("X-Credits-Remaining");
-          if (cred != null) {
-            const n = Number(cred);
-            if (!Number.isNaN(n)) onCreditsChange(n);
-          }
-          const pagesRaw = res.headers.get("X-Allowed-Pages");
-          if (pagesRaw) {
-            try {
-              const parsed = JSON.parse(pagesRaw) as unknown;
-              if (
-                Array.isArray(parsed) &&
-                parsed.every((x) => typeof x === "number")
-              ) {
-                allowedPagesRef.current = parsed;
-              }
-            } catch {
-              /* ignore */
-            }
-          }
-          return res;
-        },
-      }),
-    [onCreditsChange],
+  const [streamAllowedPages, setStreamAllowedPages] = useState<number[]>([]);
+
+  // Stable transport for useChat; getBindings runs only in transport callbacks (send/fetch), not during render.
+  // eslint-disable-next-line react-hooks/refs -- ref read is deferred to prepareSendMessagesRequest/fetch
+  const [transport] = useState(() =>
+    createChatTransport(() => transportBindingsRef.current),
   );
 
+  useLayoutEffect(() => {
+    transportBindingsRef.current.documentId = documentId;
+    transportBindingsRef.current.onCreditsChange = onCreditsChange;
+    transportBindingsRef.current.onAllowedPages = (pages) => {
+      allowedPagesRef.current = pages;
+      setStreamAllowedPages(pages);
+    };
+  }, [documentId, onCreditsChange]);
+
+  const chatId = projectId ?? documentId ?? "no-document";
+
   const { messages, sendMessage, status, error, setMessages, stop } = useChat({
-    id: documentId ?? "no-document",
+    id: chatId,
     experimental_throttle: 50,
     transport,
     onFinish: ({ message }: { message: UIMessage }) => {
@@ -185,9 +216,10 @@ export function ChatPanel({
   });
 
   useEffect(() => {
-    setMessages([]);
+    setMessages(initialMessages ?? []);
     setAllowedByMessageId(new Map());
-  }, [documentId, setMessages]);
+    setStreamAllowedPages([]);
+  }, [initialMessages, setMessages]);
 
   const [input, setInput] = useState("");
   const loading = status === "submitted" || status === "streaming";
@@ -254,7 +286,7 @@ export function ChatPanel({
             const allowedList =
               msg.role === "assistant"
                 ? (allowedByMessageId.get(msg.id) ??
-                  (assistantStreaming ? allowedPagesRef.current : []))
+                  (assistantStreaming ? streamAllowedPages : []))
                 : [];
             const allowed =
               allowedList.length > 0

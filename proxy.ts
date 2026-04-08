@@ -2,10 +2,12 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
 const isProtectedRoute = createRouteMatcher([
   "/chat(.*)",
+  "/chats(.*)",
   "/api/uploadthing(.*)",
   "/api/ingest(.*)",
   "/api/chat(.*)",
   "/api/usage(.*)",
+  "/api/projects(.*)",
 ]);
 
 /**
@@ -17,7 +19,7 @@ function isUploadThingServerHook(req: Request) {
   return req.headers.get("uploadthing-hook") != null;
 }
 
-export default clerkMiddleware(async (auth, req) => {
+export const proxy = clerkMiddleware(async (auth, req) => {
   if (isUploadThingServerHook(req)) {
     return;
   }

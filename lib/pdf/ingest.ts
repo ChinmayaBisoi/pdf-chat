@@ -36,7 +36,8 @@ export async function ingestPdfFromUrl(params: {
   clerkUserId: string;
   fileUrl: string;
   uploadThingKey?: string | null;
-}): Promise<{ documentId: string }> {
+  title?: string | null;
+}): Promise<{ documentId: string; projectId: string }> {
   const sql = getSql();
 
   assertUploadThingFileUrlForIngest(params.fileUrl);
@@ -72,18 +73,38 @@ export async function ingestPdfFromUrl(params: {
     throw new InsufficientCreditsError();
   }
 
+  let createdProjectId: string | null = null;
   try {
     const embeddings = await embedTexts(texts);
 
-    await sql`DELETE FROM documents WHERE clerk_user_id = ${params.clerkUserId}`;
+    const rawTitle = params.title?.trim();
+    const projectTitle =
+      rawTitle && rawTitle.length > 0 ? rawTitle : "Untitled chat";
+
+    const [project] = await sql`
+      INSERT INTO projects (clerk_user_id, title)
+      VALUES (${params.clerkUserId}, ${projectTitle})
+      RETURNING id
+    `;
+    const projectId = project.id as string;
+    createdProjectId = projectId;
 
     const [doc] = await sql`
-      INSERT INTO documents (clerk_user_id, file_url, upload_thing_key)
-      VALUES (${params.clerkUserId}, ${params.fileUrl}, ${params.uploadThingKey ?? null})
+      INSERT INTO documents (project_id, clerk_user_id, file_url, upload_thing_key)
+      VALUES (
+        ${projectId}::uuid,
+        ${params.clerkUserId},
+        ${params.fileUrl},
+        ${params.uploadThingKey ?? null}
+      )
       RETURNING id
     `;
 
     const documentId = doc.id as string;
+
+    await sql`
+      UPDATE projects SET updated_at = NOW() WHERE id = ${projectId}::uuid
+    `;
 
     for (let i = 0; i < nonEmpty.length; i++) {
       const page = nonEmpty[i].page;
@@ -101,8 +122,11 @@ export async function ingestPdfFromUrl(params: {
       `;
     }
 
-    return { documentId };
+    return { documentId, projectId };
   } catch (e) {
+    if (createdProjectId) {
+      await sql`DELETE FROM projects WHERE id = ${createdProjectId}::uuid`;
+    }
     await refundCredits(params.clerkUserId, ingestCost);
     throw e;
   }

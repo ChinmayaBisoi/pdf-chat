@@ -53,12 +53,13 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { documentId } = await ingestPdfFromUrl({
+    const { documentId, projectId } = await ingestPdfFromUrl({
       clerkUserId: userId,
       fileUrl: parsed.data.fileUrl,
       uploadThingKey: parsed.data.uploadThingKey,
+      title: parsed.data.title,
     });
-    return NextResponse.json({ documentId });
+    return NextResponse.json({ documentId, projectId });
   } catch (e) {
     if (e instanceof InsufficientCreditsError) {
       const creditsRemaining = await getCreditsBalance(userId);

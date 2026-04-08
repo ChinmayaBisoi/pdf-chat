@@ -1,11 +1,15 @@
 import { auth } from "@clerk/nextjs/server";
 import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
+import type { UIMessage } from "ai";
+import { nanoid } from "nanoid";
 import { NextResponse } from "next/server";
 import {
   generateCitationsForAnswer,
   streamAnswerMarkdown,
 } from "@/lib/ai/citation-chat";
 import { getSql } from "@/lib/db";
+import { insertChatMessage } from "@/lib/db/project-thread";
+import type { Citation } from "@/lib/pdf/types";
 import { dedupePages, retrieveChunksForQuery } from "@/lib/pdf/retrieve";
 import { getCreditCostChat } from "@/lib/usage/config";
 import { consumeCredits, getCreditsBalance, refundCredits } from "@/lib/usage/credits";
@@ -40,13 +44,15 @@ export async function POST(req: Request) {
   const sql = getSql();
 
   const [doc] = await sql`
-    SELECT id FROM documents
+    SELECT id, project_id FROM documents
     WHERE id = ${documentId}::uuid AND clerk_user_id = ${userId}
   `;
 
   if (!doc) {
     return NextResponse.json({ error: "Document not found" }, { status: 404 });
   }
+
+  const projectId = doc.project_id as string;
 
   const rl = await checkRateLimit(userId, "chat_minute");
   if (!rl.ok) {
@@ -96,6 +102,15 @@ export async function POST(req: Request) {
     const deduped = dedupePages(chunks);
     const allowedPages = [...new Set(deduped.map((c) => c.page))];
 
+    const userMessageId = nanoid();
+    const userParts: UIMessage["parts"] = [{ type: "text", text: message }];
+    await insertChatMessage({
+      projectId,
+      id: userMessageId,
+      role: "user",
+      parts: userParts,
+    });
+
     const headers = new Headers();
     headers.set("X-Credits-Remaining", String(spent.balance));
     headers.set("X-Allowed-Pages", JSON.stringify(allowedPages));
@@ -115,6 +130,7 @@ export async function POST(req: Request) {
         await result.consumeStream();
         const answerText = await result.text;
 
+        let citationList: Citation[] = [];
         try {
           const citations = await generateCitationsForAnswer({
             userMessage: message,
@@ -122,10 +138,11 @@ export async function POST(req: Request) {
             contextBlocks: deduped,
             allowedPages,
           });
+          citationList = citations.citations;
           writer.write({
             type: "data-citations",
             id: "citations",
-            data: citations.citations,
+            data: citationList,
           });
         } catch (e) {
           console.error("citation generation failed", e);
@@ -135,6 +152,21 @@ export async function POST(req: Request) {
             data: [],
           });
         }
+
+        const assistantParts: UIMessage["parts"] = [
+          { type: "text", text: answerText, state: "done" },
+          {
+            type: "data-citations",
+            id: "citations",
+            data: citationList,
+          },
+        ];
+        await insertChatMessage({
+          projectId,
+          id: nanoid(),
+          role: "assistant",
+          parts: assistantParts,
+        });
       },
     });
 

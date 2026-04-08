@@ -18,6 +18,12 @@ export function Navbar() {
 
         <div className="flex items-center gap-3">
           <DbStatusIndicator />
+          <Link
+            href="/chats"
+            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            All Chats
+          </Link>
           <NavAuth />
         </div>
       </nav>

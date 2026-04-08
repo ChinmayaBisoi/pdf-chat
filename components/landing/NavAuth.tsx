@@ -35,8 +35,8 @@ export function NavAuth() {
 
   return (
     <div className="flex items-center gap-2">
-      <Button variant="ghost" size="sm" asChild>
-        <Link href="/chat">Chat</Link>
+      <Button size="sm" asChild>
+        <Link href="/chat">New Chat</Link>
       </Button>
       <UserButton />
     </div>
