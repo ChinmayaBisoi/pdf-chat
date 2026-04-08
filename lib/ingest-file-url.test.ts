@@ -23,6 +23,12 @@ describe("assertUploadThingFileUrlForIngest", () => {
     ).not.toThrow();
   });
 
+  it("accepts subdomains of ufs.sh", () => {
+    expect(() =>
+      assertUploadThingFileUrlForIngest("https://cdn.ufs.sh/f/x"),
+    ).not.toThrow();
+  });
+
   it("rejects http", () => {
     expect(() =>
       assertUploadThingFileUrlForIngest("http://utfs.io/f/x"),

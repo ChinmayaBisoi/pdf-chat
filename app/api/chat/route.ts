@@ -1,7 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import {
   generateCitationsForAnswer,
   streamAnswerMarkdown,
@@ -14,11 +13,7 @@ import {
   checkRateLimit,
   retryAfterSecondsForKind,
 } from "@/lib/usage/rate-limit";
-
-const bodySchema = z.object({
-  documentId: z.uuid(),
-  message: z.string().min(1).max(12_000),
-});
+import { chatPostBodySchema } from "@/lib/validation/api-bodies";
 
 export async function POST(req: Request) {
   const { userId } = await auth();
@@ -33,7 +28,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const parsed = bodySchema.safeParse(json);
+  const parsed = chatPostBodySchema.safeParse(json);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Validation failed", issues: parsed.error.flatten() },

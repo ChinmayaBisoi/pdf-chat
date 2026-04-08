@@ -1,40 +1,41 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+const { mockSql } = vi.hoisted(() => ({ mockSql: vi.fn() }));
 
 vi.mock("@/lib/db", () => ({
-  getSql: vi.fn(),
+  getSql: () => mockSql,
 }));
 
-import { getSql } from "@/lib/db";
-import { pingDatabase } from "./ping";
+import { pingDatabase } from "@/lib/db/ping";
 
 describe("pingDatabase", () => {
-  beforeEach(() => {
-    vi.mocked(getSql).mockReset();
+  afterEach(() => {
+    vi.clearAllMocks();
   });
 
-  it("returns ok with latency when SELECT 1 succeeds", async () => {
-    vi.mocked(getSql).mockReturnValue(() => Promise.resolve([{ "?column?": 1 }]));
-    const r = await pingDatabase();
-    expect(r.ok).toBe(true);
-    if (r.ok) {
-      expect(typeof r.latencyMs).toBe("number");
-      expect(r.latencyMs).toBeGreaterThanOrEqual(0);
+  it("returns ok with latency when SELECT succeeds", async () => {
+    mockSql.mockResolvedValueOnce([]);
+    const result = await pingDatabase();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.latencyMs).toBeGreaterThanOrEqual(0);
+    }
+    expect(mockSql).toHaveBeenCalled();
+  });
+
+  it("returns error string when query throws", async () => {
+    mockSql.mockRejectedValueOnce(new Error("connection refused"));
+    const result = await pingDatabase();
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain("connection refused");
     }
   });
 
-  it("returns error when query throws", async () => {
-    vi.mocked(getSql).mockReturnValue(() =>
-      Promise.reject(new Error("connection refused")),
-    );
-    const r = await pingDatabase();
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toContain("connection refused");
-  });
-
   it("stringifies non-Error throws", async () => {
-    vi.mocked(getSql).mockReturnValue(() => Promise.reject("boom"));
-    const r = await pingDatabase();
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toBe("boom");
+    mockSql.mockRejectedValueOnce("boom");
+    const result = await pingDatabase();
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe("boom");
   });
 });

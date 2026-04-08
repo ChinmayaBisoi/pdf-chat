@@ -38,7 +38,6 @@ export function PdfViewerPane({ fileUrl, jumpRef }: PdfViewerPaneProps) {
 
   const pageNav = pageNavigationPlugin();
   const zoom = zoomPlugin();
-  // searchPlugin uses hooks internally; it must run at render top level, not inside useMemo/useEffect.
   const search = searchPlugin({ enableShortcuts: false });
 
   useLayoutEffect(() => {
@@ -152,10 +151,10 @@ export function PdfViewerPane({ fileUrl, jumpRef }: PdfViewerPaneProps) {
   return (
     <div
       ref={containerRef}
-      className="flex h-full min-h-[480px] flex-1 flex-col overflow-hidden rounded-lg border bg-background"
+      className="flex h-full min-h-0 max-h-[80dvh] flex-1 flex-col overflow-hidden rounded-lg border bg-background"
     >
       <Worker workerUrl={WORKER_URL}>
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden [&_.rpv-core__viewer]:min-h-0 [&_.rpv-core__viewer]:h-full">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden [&_.rpv-core__viewer]:min-h-0 [&_.rpv-core__viewer]:h-full">
           <Viewer
             fileUrl={fileUrl}
             plugins={[zoom, pageNav, search, highlight]}
