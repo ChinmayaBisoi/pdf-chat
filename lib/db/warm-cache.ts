@@ -1,19 +1,40 @@
 const STORAGE_KEY = "pdf-chats-db-warm-stamps";
-const MAX_STAMPS = 5;
+export const MAX_STAMPS = 5;
 /** Skip warm if we pinged within this window (Neon stays warm a few minutes). */
-const COOLDOWN_MS = 5 * 60 * 1000;
+export const COOLDOWN_MS = 5 * 60 * 1000;
 
-function readStamps(): number[] {
-  if (typeof window === "undefined") return [];
+/** Parse stored JSON into sorted, bounded stamp list (for tests + browser). */
+export function parseStampsFromStorage(raw: string | null): number[] {
+  if (!raw) return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
     return parsed
       .filter((x): x is number => typeof x === "number" && Number.isFinite(x))
       .sort((a, b) => a - b)
       .slice(-MAX_STAMPS);
+  } catch {
+    return [];
+  }
+}
+
+export function shouldWarmFromStamps(stamps: number[], now: number): boolean {
+  if (stamps.length === 0) return true;
+  const newest = stamps[stamps.length - 1];
+  return now - newest >= COOLDOWN_MS;
+}
+
+export function nextStampsAfterWarm(stamps: number[], now: number): number[] {
+  const next = [...stamps, now];
+  while (next.length > MAX_STAMPS) next.shift();
+  return next;
+}
+
+function readStamps(): number[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return parseStampsFromStorage(raw);
   } catch {
     return [];
   }
@@ -30,16 +51,10 @@ function writeStamps(stamps: number[]): void {
  * Keeps at most 5 timestamps (rolling) after each successful warm.
  */
 export function shouldWarmDatabase(): boolean {
-  const stamps = readStamps();
-  if (stamps.length === 0) return true;
-  const newest = stamps[stamps.length - 1];
-  return Date.now() - newest >= COOLDOWN_MS;
+  return shouldWarmFromStamps(readStamps(), Date.now());
 }
 
 /** Call after a successful warm ping so cooldown and history stay accurate. */
 export function recordWarmTimestamp(): void {
-  const stamps = readStamps();
-  stamps.push(Date.now());
-  while (stamps.length > MAX_STAMPS) stamps.shift();
-  writeStamps(stamps);
+  writeStamps(nextStampsAfterWarm(readStamps(), Date.now()));
 }

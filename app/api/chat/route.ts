@@ -1,8 +1,12 @@
 import { auth } from "@clerk/nextjs/server";
+import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import {
+  generateCitationsForAnswer,
+  streamAnswerMarkdown,
+} from "@/lib/ai/citation-chat";
 import { getSql } from "@/lib/db";
-import { generateCitationAnswer } from "@/lib/ai/citation-chat";
 import { dedupePages, retrieveChunksForQuery } from "@/lib/pdf/retrieve";
 import { getCreditCostChat } from "@/lib/usage/config";
 import { consumeCredits, getCreditsBalance, refundCredits } from "@/lib/usage/credits";
@@ -97,17 +101,49 @@ export async function POST(req: Request) {
     const deduped = dedupePages(chunks);
     const allowedPages = [...new Set(deduped.map((c) => c.page))];
 
-    const result = await generateCitationAnswer({
-      userMessage: message,
-      contextBlocks: deduped,
-      allowedPages,
+    const headers = new Headers();
+    headers.set("X-Credits-Remaining", String(spent.balance));
+    headers.set("X-Allowed-Pages", JSON.stringify(allowedPages));
+
+    const stream = createUIMessageStream({
+      execute: async ({ writer }) => {
+        const result = streamAnswerMarkdown({
+          userMessage: message,
+          contextBlocks: deduped,
+          allowedPages,
+          onError: async () => {
+            await refundCredits(userId, chatCost);
+          },
+        });
+
+        writer.merge(result.toUIMessageStream());
+        await result.consumeStream();
+        const answerText = await result.text;
+
+        try {
+          const citations = await generateCitationsForAnswer({
+            userMessage: message,
+            answerText,
+            contextBlocks: deduped,
+            allowedPages,
+          });
+          writer.write({
+            type: "data-citations",
+            id: "citations",
+            data: citations.citations,
+          });
+        } catch (e) {
+          console.error("citation generation failed", e);
+          writer.write({
+            type: "data-citations",
+            id: "citations",
+            data: [],
+          });
+        }
+      },
     });
 
-    return NextResponse.json({
-      ...result,
-      allowedPages,
-      creditsRemaining: spent.balance,
-    });
+    return createUIMessageStreamResponse({ stream, headers });
   } catch (e) {
     await refundCredits(userId, chatCost);
     console.error("chat failed", e);

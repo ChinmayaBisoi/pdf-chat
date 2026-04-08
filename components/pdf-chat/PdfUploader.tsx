@@ -30,6 +30,14 @@ export function PdfUploader({
 
   const isHero = layout === "hero";
 
+  const buttonLabel = busy
+    ? phase === "uploading"
+      ? "Uploading…"
+      : phase === "parsing"
+        ? "Reading PDF…"
+        : "Embedding…"
+    : null;
+
   return (
     <div
       className={cn(
@@ -39,6 +47,7 @@ export function PdfUploader({
     >
       <UploadPdfButton
         endpoint="pdfUploader"
+        disabled={busy}
         appearance={{
           container: isHero
             ? "flex w-full flex-col items-center gap-2"
@@ -49,7 +58,8 @@ export function PdfUploader({
               "w-full max-w-sm rounded-full px-8 py-2.5 text-base font-medium shadow-sm",
               "whitespace-nowrap",
               !ready && "opacity-70",
-              isUploading && "cursor-wait",
+              (isUploading || busy) && "cursor-wait",
+              busy && "cursor-not-allowed opacity-80",
             ),
           allowedContent: cn(
             "text-xs text-muted-foreground",
@@ -58,11 +68,12 @@ export function PdfUploader({
         }}
         content={{
           button: ({ ready }) =>
-            ready
+            buttonLabel ??
+            (ready
               ? isHero
                 ? "Select PDF"
                 : "Replace PDF"
-              : "Preparing…",
+              : "Preparing…"),
           allowedContent: () => "PDF only, up to 32 MB",
         }}
         onUploadBegin={() => {

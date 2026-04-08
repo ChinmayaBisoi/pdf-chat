@@ -18,10 +18,12 @@ const PdfViewerPane = dynamic(
     ),
   },
 );
-import type { IngestPhase } from "@/lib/pdf/types";
+import type { Citation, IngestPhase } from "@/lib/pdf/types";
 
 export function PdfWorkspace() {
-  const jumpRef = useRef<((page: number) => void) | null>(null);
+  const jumpRef = useRef<((citation: Citation) => void | Promise<void>) | null>(
+    null,
+  );
   const [phase, setPhase] = useState<IngestPhase>("idle");
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [documentId, setDocumentId] = useState<string | null>(null);
@@ -116,7 +118,7 @@ export function PdfWorkspace() {
             </div>
             <ChatPanel
               documentId={documentId}
-              onCitationClick={(page) => jumpRef.current?.(page)}
+              onCitationClick={(citation) => void jumpRef.current?.(citation)}
               credits={credits}
               onCreditsChange={setCredits}
             />

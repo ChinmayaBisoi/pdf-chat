@@ -9,17 +9,27 @@ import {
 } from "@react-pdf-viewer/core";
 import { highlightPlugin, Trigger } from "@react-pdf-viewer/highlight";
 import { pageNavigationPlugin } from "@react-pdf-viewer/page-navigation";
+import { searchPlugin } from "@react-pdf-viewer/search";
 import { zoomPlugin } from "@react-pdf-viewer/zoom";
 
 import "@react-pdf-viewer/core/lib/styles/index.css";
 import "@react-pdf-viewer/highlight/lib/styles/index.css";
+import "@react-pdf-viewer/search/lib/styles/index.css";
+
+import type { Citation } from "@/lib/pdf/types";
 
 const WORKER_URL =
   "https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
 
 interface PdfViewerPaneProps {
   fileUrl: string | null;
-  jumpRef: React.MutableRefObject<((page: number) => void) | null>;
+  jumpRef: React.MutableRefObject<
+    ((citation: Citation) => void | Promise<void>) | null
+  >;
+}
+
+function normalizeQuoteForSearch(s: string): string {
+  return s.trim().replace(/\s+/g, " ");
 }
 
 export function PdfViewerPane({ fileUrl, jumpRef }: PdfViewerPaneProps) {
@@ -28,6 +38,8 @@ export function PdfViewerPane({ fileUrl, jumpRef }: PdfViewerPaneProps) {
 
   const pageNav = pageNavigationPlugin();
   const zoom = zoomPlugin();
+  // searchPlugin uses hooks internally; it must run at render top level, not inside useMemo/useEffect.
+  const search = searchPlugin({ enableShortcuts: false });
 
   useLayoutEffect(() => {
     zoomRef.current = zoom;
@@ -68,13 +80,39 @@ export function PdfViewerPane({ fileUrl, jumpRef }: PdfViewerPaneProps) {
   });
 
   useEffect(() => {
-    jumpRef.current = (page: number) => {
-      pageNav.jumpToPage(page - 1);
+    jumpRef.current = async (citation: Citation) => {
+      const pageIndex = citation.page - 1;
+      pageNav.jumpToPage(pageIndex);
+
+      const raw = citation.excerpt?.trim();
+      if (!raw) return;
+
+      search.clearHighlights();
+      search.setTargetPages(({ pageIndex: pi }) => pi === pageIndex);
+
+      const runSearch = async (needle: string) => {
+        const q = normalizeQuoteForSearch(needle);
+        if (!q) return [];
+        return search.highlight({
+          keyword: q.length > 220 ? q.slice(0, 220) : q,
+          matchCase: false,
+          wholeWords: false,
+        });
+      };
+
+      let matches = await runSearch(raw);
+      if (!matches || matches.length === 0) {
+        const shorter = normalizeQuoteForSearch(raw).slice(0, 72);
+        if (shorter.length >= 8) {
+          matches = await runSearch(shorter);
+        }
+      }
     };
+
     return () => {
       jumpRef.current = null;
     };
-  }, [jumpRef, pageNav]);
+  }, [jumpRef, pageNav, search]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -120,7 +158,7 @@ export function PdfViewerPane({ fileUrl, jumpRef }: PdfViewerPaneProps) {
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden [&_.rpv-core__viewer]:min-h-0 [&_.rpv-core__viewer]:h-full">
           <Viewer
             fileUrl={fileUrl}
-            plugins={[zoom, pageNav, highlight]}
+            plugins={[zoom, pageNav, search, highlight]}
             defaultScale={SpecialZoomLevel.PageWidth}
             scrollMode={ScrollMode.Vertical}
             onDocumentLoad={() => {

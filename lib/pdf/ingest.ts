@@ -5,8 +5,11 @@ import { getCreditCostEmbedPerPage } from "@/lib/usage/config";
 import { consumeCredits, getCreditsBalance, refundCredits } from "@/lib/usage/credits";
 import { InsufficientCreditsError } from "@/lib/usage/errors";
 import { extractPdfPages, getPdfPageCount } from "@/lib/pdf/extract";
-
-const MAX_INDEXED_PAGES = 300;
+import {
+  computeIngestCreditCost,
+  computeMaxBillablePages,
+  MAX_INDEXED_PAGES,
+} from "@/lib/pdf/ingest-math";
 
 export class PdfPageLimitError extends Error {
   constructor(maxPages: number) {
@@ -46,8 +49,8 @@ export async function ingestPdfFromUrl(params: {
 
   const pageCount = await getPdfPageCount(buffer);
   const perPage = getCreditCostEmbedPerPage();
-  const maxBillablePages = Math.min(pageCount, MAX_INDEXED_PAGES);
-  const maxIngestCost = maxBillablePages * perPage;
+  const maxBillablePages = computeMaxBillablePages(pageCount);
+  const maxIngestCost = computeIngestCreditCost(maxBillablePages, perPage);
   const balance = await getCreditsBalance(params.clerkUserId);
   if (balance < maxIngestCost) {
     throw new InsufficientCreditsError();
@@ -63,7 +66,7 @@ export async function ingestPdfFromUrl(params: {
   }
 
   const texts = nonEmpty.map((p) => p.text);
-  const ingestCost = nonEmpty.length * perPage;
+  const ingestCost = computeIngestCreditCost(nonEmpty.length, perPage);
   const spent = await consumeCredits(params.clerkUserId, ingestCost);
   if (!spent.ok) {
     throw new InsufficientCreditsError();
