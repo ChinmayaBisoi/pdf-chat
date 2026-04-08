@@ -1,5 +1,6 @@
 import { FileText } from "lucide-react";
 import Link from "next/link";
+import { DbStatusIndicator } from "@/components/db/DbStatusIndicator";
 import { NavAuth } from "@/components/landing/NavAuth";
 
 export function Navbar() {
@@ -15,7 +16,10 @@ export function Navbar() {
           </span>
         </Link>
 
-        <NavAuth />
+        <div className="flex items-center gap-3">
+          <DbStatusIndicator />
+          <NavAuth />
+        </div>
       </nav>
     </header>
   );
