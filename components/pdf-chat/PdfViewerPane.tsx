@@ -1,13 +1,17 @@
 "use client";
 
-import { useEffect } from "react";
-import { Viewer, Worker } from "@react-pdf-viewer/core";
-import { defaultLayoutPlugin } from "@react-pdf-viewer/default-layout";
+import { useEffect, useLayoutEffect, useRef } from "react";
+import {
+  ScrollMode,
+  SpecialZoomLevel,
+  Viewer,
+  Worker,
+} from "@react-pdf-viewer/core";
 import { highlightPlugin, Trigger } from "@react-pdf-viewer/highlight";
 import { pageNavigationPlugin } from "@react-pdf-viewer/page-navigation";
+import { zoomPlugin } from "@react-pdf-viewer/zoom";
 
 import "@react-pdf-viewer/core/lib/styles/index.css";
-import "@react-pdf-viewer/default-layout/lib/styles/index.css";
 import "@react-pdf-viewer/highlight/lib/styles/index.css";
 
 const WORKER_URL =
@@ -19,9 +23,16 @@ interface PdfViewerPaneProps {
 }
 
 export function PdfViewerPane({ fileUrl, jumpRef }: PdfViewerPaneProps) {
-  // These factories use React hooks internally; they must run at component top
-  // level, not inside useMemo (see rules of hooks).
+  const containerRef = useRef<HTMLDivElement>(null);
+  const zoomRef = useRef<ReturnType<typeof zoomPlugin> | null>(null);
+
   const pageNav = pageNavigationPlugin();
+  const zoom = zoomPlugin();
+
+  useLayoutEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+
   const highlight = highlightPlugin({
     trigger: Trigger.TextSelection,
     renderHighlightTarget: (props) => (
@@ -56,8 +67,6 @@ export function PdfViewerPane({ fileUrl, jumpRef }: PdfViewerPaneProps) {
     ),
   });
 
-  const layout = defaultLayoutPlugin();
-
   useEffect(() => {
     jumpRef.current = (page: number) => {
       pageNav.jumpToPage(page - 1);
@@ -66,6 +75,33 @@ export function PdfViewerPane({ fileUrl, jumpRef }: PdfViewerPaneProps) {
       jumpRef.current = null;
     };
   }, [jumpRef, pageNav]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || !fileUrl) {
+      return;
+    }
+
+    let raf = 0;
+    const fitPageWidth = () => {
+      zoomRef.current?.zoomTo(SpecialZoomLevel.PageWidth);
+    };
+    const scheduleFit = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        fitPageWidth();
+      });
+    };
+
+    const ro = new ResizeObserver(scheduleFit);
+    ro.observe(el);
+    scheduleFit();
+
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(raf);
+    };
+  }, [fileUrl]);
 
   if (!fileUrl) {
     return (
@@ -76,13 +112,22 @@ export function PdfViewerPane({ fileUrl, jumpRef }: PdfViewerPaneProps) {
   }
 
   return (
-    <div className="h-full min-h-[480px] overflow-hidden rounded-lg border bg-background">
+    <div
+      ref={containerRef}
+      className="flex h-full min-h-[480px] flex-1 flex-col overflow-hidden rounded-lg border bg-background"
+    >
       <Worker workerUrl={WORKER_URL}>
-        <Viewer
-          fileUrl={fileUrl}
-          plugins={[layout, pageNav, highlight]}
-          defaultScale={1}
-        />
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden [&_.rpv-core__viewer]:min-h-0 [&_.rpv-core__viewer]:h-full">
+          <Viewer
+            fileUrl={fileUrl}
+            plugins={[zoom, pageNav, highlight]}
+            defaultScale={SpecialZoomLevel.PageWidth}
+            scrollMode={ScrollMode.Vertical}
+            onDocumentLoad={() => {
+              zoom.zoomTo(SpecialZoomLevel.PageWidth);
+            }}
+          />
+        </div>
       </Worker>
     </div>
   );
